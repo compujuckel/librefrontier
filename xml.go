@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/xml"
-	"io"
 	"librefrontier/RadioProvider"
 	"log"
+	"net/http"
 	"net/url"
+	"strconv"
 )
 
 type ListOfItems struct {
@@ -36,6 +37,13 @@ type Item struct {
 	StationMime      string `xml:"StationMime,omitempty"`
 	Relia            string `xml:"Relia,omitempty"`
 	Bookmark         string `xml:"Bookmark,omitempty"`
+
+	SearchURL       string `xml:"SearchURL,omitempty"`
+	SearchURLBackUp string `xml:"SearchURLBackUp,omitempty"`
+	SearchCaption   string `xml:"SearchCaption,omitempty"`
+	SearchTextbox   string `xml:"SearchTextbox,omitempty"`
+	SearchGo        string `xml:"SearchGo,omitempty"`
+	SearchCancel    string `xml:"SearchCancel,omitempty"`
 }
 
 func CreateCountryList(countries []RadioProvider.Country, start int, end int) ListOfItems {
@@ -103,26 +111,31 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 
 func CreateStationItem(station RadioProvider.Station) Item {
 	return Item{
-		ItemType:         "Station",
-		StationName:      station.Name + " (" + station.Codec + " " + station.Bitrate + ")",
-		StationId:        station.Id,
-		StationLocation:  station.Country,
-		StationDesc:      station.Homepage,
-		StationBandWidth: station.Bitrate,
-		StationMime:      station.Codec,
-		StationFormat:    station.Genre,
-		StationUrl:       "http://192.168.178.156/station/" + station.Id + "/play",
+		ItemType:    "Station",
+		StationName: station.Name, // + " (" + station.Codec + " " + station.Bitrate + ")",
+		StationId:   station.Id,
+		//StationLocation:  station.Country,
+		//StationDesc:      station.Homepage,
+		//StationBandWidth: station.Bitrate,
+		//StationMime:      station.Codec,
+		//StationFormat:    station.Genre,
+		StationUrl: "http://192.168.178.156/station/" + station.Id + "/play",
 		//StationUrl: station.StreamUrl,
 	}
 }
 
-func WriteToWire(w io.Writer, items ListOfItems) {
+func WriteToWire(w http.ResponseWriter, items ListOfItems) {
 	result, err := xml.Marshal(items)
 	if err != nil {
 		log.Fatal("Error in xml.Marshal", err)
 	}
 
-	_, err = w.Write([]byte(xml.Header))
+	hdr := []byte(xml.Header)
+
+	contentLength := len(hdr) + len(result)
+	w.Header().Set("Content-Length", strconv.Itoa(contentLength))
+
+	_, err = w.Write(hdr)
 	if err != nil {
 		log.Fatal("Error writing to wire", err)
 	}

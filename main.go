@@ -40,6 +40,14 @@ func gofile(w http.ResponseWriter, r *http.Request) {
 				UrlDir:       "http://192.168.178.156/stations/liked",
 				UrlDirBackUp: "http://192.168.178.156/stations/liked",
 			}, {
+				ItemType:        "Search",
+				SearchURL:       "http://192.168.178.156/stations/search",
+				SearchURLBackUp: "http://192.168.178.156/stations/search",
+				SearchCaption:   "Search stations",
+				SearchTextbox:   "",
+				SearchGo:        "Search",
+				SearchCancel:    "%search-cancel%",
+			}, {
 				ItemType:     "Dir",
 				Title:        "LibreFrontier PoC",
 				UrlDir:       "http://192.168.178.156/",
