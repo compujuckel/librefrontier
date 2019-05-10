@@ -23,4 +23,5 @@ type RadioProvider interface {
 	GetMostPopularStations(count int) ([]Station, error)
 	GetMostLikedStations(count int) ([]Station, error)
 	GetStationById(stationId string) (Station, error)
+	SearchStations(search string) ([]Station, error)
 }

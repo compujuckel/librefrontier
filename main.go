@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"librefrontier/RadioProvider"
 	"librefrontier/RadioProvider/RadioBrowser"
-	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
+
+var baseUrl = os.Getenv("LF_BASE_URL")
 
 func login(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -21,39 +24,41 @@ func gofile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	log.Printf("gofile dlang = %s", vars["dlang"])
 
-	menu := ListOfItems{
-		ItemCount: 4,
-		Items: []Item{
-			{
-				ItemType:     "Dir",
-				Title:        "By Country",
-				UrlDir:       "http://192.168.178.156/countries",
-				UrlDirBackUp: "http://192.168.178.156/countries",
-			}, {
-				ItemType:     "Dir",
-				Title:        "Most popular",
-				UrlDir:       "http://192.168.178.156/stations/popular",
-				UrlDirBackUp: "http://192.168.178.156/stations/popular",
-			}, {
-				ItemType:     "Dir",
-				Title:        "Most liked",
-				UrlDir:       "http://192.168.178.156/stations/liked",
-				UrlDirBackUp: "http://192.168.178.156/stations/liked",
-			}, {
-				ItemType:        "Search",
-				SearchURL:       "http://192.168.178.156/stations/search",
-				SearchURLBackUp: "http://192.168.178.156/stations/search",
-				SearchCaption:   "Search stations",
-				SearchTextbox:   "",
-				SearchGo:        "Search",
-				SearchCancel:    "%search-cancel%",
-			}, {
-				ItemType:     "Dir",
-				Title:        "LibreFrontier PoC",
-				UrlDir:       "http://192.168.178.156/",
-				UrlDirBackUp: "http://192.168.178.156/",
-			},
+	items := []Item{
+		{
+			ItemType:     "Dir",
+			Title:        "By Country",
+			UrlDir:       baseUrl + "/countries",
+			UrlDirBackUp: baseUrl + "/countries",
+		}, {
+			ItemType:     "Dir",
+			Title:        "Most popular",
+			UrlDir:       baseUrl + "/stations/popular",
+			UrlDirBackUp: baseUrl + "/stations/popular",
+		}, {
+			ItemType:     "Dir",
+			Title:        "Most liked",
+			UrlDir:       baseUrl + "/stations/liked",
+			UrlDirBackUp: baseUrl + "/stations/liked",
+		}, {
+			ItemType:        "Search",
+			SearchURL:       baseUrl + "/stations/search?sSearchType=2",
+			SearchURLBackUp: baseUrl + "/stations/search?sSearchType=2",
+			SearchCaption:   "Search stations",
+			SearchTextbox:   "",
+			SearchGo:        "Search",
+			SearchCancel:    "%search-cancel%",
+		}, {
+			ItemType:     "Dir",
+			Title:        "LibreFrontier PoC",
+			UrlDir:       baseUrl + "/",
+			UrlDirBackUp: baseUrl + "/",
 		},
+	}
+
+	menu := ListOfItems{
+		ItemCount: len(items),
+		Items:     items,
 	}
 
 	WriteToWire(w, menu)
@@ -81,12 +86,16 @@ func getCountries(w http.ResponseWriter, r *http.Request) {
 
 	iStart, err := strconv.Atoi(vars["startItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	iEnd, err := strconv.Atoi(vars["endItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	rp := RadioBrowser.Client{}
@@ -106,12 +115,16 @@ func getStationsByCountry(w http.ResponseWriter, r *http.Request) {
 
 	iStart, err := strconv.Atoi(vars["startItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	iEnd, err := strconv.Atoi(vars["endItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	rp := RadioBrowser.Client{}
@@ -131,12 +144,16 @@ func getMostPopularStations(w http.ResponseWriter, r *http.Request) {
 
 	iStart, err := strconv.Atoi(vars["startItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	iEnd, err := strconv.Atoi(vars["endItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	rp := RadioBrowser.Client{}
@@ -156,17 +173,50 @@ func getMostLikedStations(w http.ResponseWriter, r *http.Request) {
 
 	iStart, err := strconv.Atoi(vars["startItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	iEnd, err := strconv.Atoi(vars["endItems"])
 	if err != nil {
-		log.Fatal("Error converting str to int", err)
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
 	}
 
 	rp := RadioBrowser.Client{}
 
 	stations, err := rp.GetMostLikedStations(100)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+	list := CreateStationsList(stations, iStart-1, iEnd)
+
+	WriteToWire(w, list)
+}
+
+func searchStations(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	iStart, err := strconv.Atoi(vars["startItems"])
+	if err != nil {
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
+	}
+
+	iEnd, err := strconv.Atoi(vars["endItems"])
+	if err != nil {
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
+	}
+
+	rp := RadioBrowser.Client{}
+
+	stations, err := rp.SearchStations(vars["search"])
 	if err != nil {
 		w.WriteHeader(500)
 		return
@@ -191,6 +241,11 @@ func getStreamUrl(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors: true,
+	})
+	log.Info("Main Startup")
 
 	r := mux.NewRouter()
 
@@ -214,6 +269,10 @@ func main() {
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/stations/liked", getMostLikedStations).
+		Queries("startItems", "{startItems}").
+		Queries("endItems", "{endItems}")
+	r.HandleFunc("/stations/search", searchStations).
+		Queries("search", "{search}").
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/station/{station}/play", getStreamUrl)

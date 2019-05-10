@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/xml"
+	log "github.com/sirupsen/logrus"
 	"librefrontier/RadioProvider"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -57,21 +57,21 @@ func CreateCountryList(countries []RadioProvider.Country, start int, end int) Li
 		end = result.ItemCount
 	}
 
-	log.Printf("countries %d - %d\n", start, end)
+	log.Debugf("countries %d - %d\n", start, end)
 
 	var items []Item
 
 	items = append(items, Item{
 		ItemType:          "Previous",
-		UrlPrevious:       "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
-		UrlPreviousBackUp: "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPrevious:       baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPreviousBackUp: baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
 		items = append(items, Item{
 			ItemType:     "Dir",
 			Title:        countries[i].Name,
-			UrlDir:       "http://192.168.178.156/country/" + url.PathEscape(countries[i].Id),
-			UrlDirBackUp: "http://192.168.178.156/country/" + url.PathEscape(countries[i].Id),
+			UrlDir:       baseUrl + "/country/" + url.PathEscape(countries[i].Id),
+			UrlDirBackUp: baseUrl + "/country/" + url.PathEscape(countries[i].Id),
 		})
 	}
 
@@ -91,14 +91,14 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 		end = result.ItemCount
 	}
 
-	log.Printf("stations %d - %d\n", start, end)
+	log.Debugf("stations %d - %d\n", start, end)
 
 	var items []Item
 
 	items = append(items, Item{
 		ItemType:          "Previous",
-		UrlPrevious:       "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
-		UrlPreviousBackUp: "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPrevious:       baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPreviousBackUp: baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
 		items = append(items, CreateStationItem(stations[i]))
@@ -112,14 +112,14 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 func CreateStationItem(station RadioProvider.Station) Item {
 	return Item{
 		ItemType:    "Station",
-		StationName: station.Name, // + " (" + station.Codec + " " + station.Bitrate + ")",
+		StationName: station.Name,
 		StationId:   station.Id,
 		//StationLocation:  station.Country,
 		//StationDesc:      station.Homepage,
 		//StationBandWidth: station.Bitrate,
 		//StationMime:      station.Codec,
 		//StationFormat:    station.Genre,
-		StationUrl: "http://192.168.178.156/station/" + station.Id + "/play",
+		StationUrl: baseUrl + "/station/" + station.Id + "/play",
 		//StationUrl: station.StreamUrl,
 	}
 }
@@ -127,7 +127,7 @@ func CreateStationItem(station RadioProvider.Station) Item {
 func WriteToWire(w http.ResponseWriter, items ListOfItems) {
 	result, err := xml.Marshal(items)
 	if err != nil {
-		log.Fatal("Error in xml.Marshal", err)
+		log.Error("Error in xml.Marshal", err)
 	}
 
 	hdr := []byte(xml.Header)
@@ -137,11 +137,11 @@ func WriteToWire(w http.ResponseWriter, items ListOfItems) {
 
 	_, err = w.Write(hdr)
 	if err != nil {
-		log.Fatal("Error writing to wire", err)
+		log.Error("Error writing to wire", err)
 	}
 
 	_, err = w.Write(result)
 	if err != nil {
-		log.Fatal("Error writing to wire", err)
+		log.Error("Error writing to wire", err)
 	}
 }

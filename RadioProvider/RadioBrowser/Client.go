@@ -3,9 +3,10 @@ package RadioBrowser
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/resty.v1"
 	"librefrontier/RadioProvider"
-	"log"
+	"net/url"
 	"strconv"
 )
 
@@ -25,7 +26,7 @@ func (r *Client) GetCountries() ([]RadioProvider.Country, error) {
 		return nil, errors.Wrap(err, "unmarshal countries")
 	}
 
-	log.Printf("Result: %v", countries)
+	log.Debugf("Result: %v", countries)
 
 	return countries, nil
 }
@@ -43,7 +44,7 @@ func (r *Client) GetStationsByCountry(countryId string) ([]RadioProvider.Station
 		return nil, errors.Wrap(err, "unmarshal stations")
 	}
 
-	log.Printf("Result: %v", stations)
+	log.Debugf("Result: %v", stations)
 
 	return stations, nil
 }
@@ -61,7 +62,7 @@ func (r *Client) GetMostPopularStations(count int) ([]RadioProvider.Station, err
 		return nil, errors.Wrap(err, "unmarshal stations")
 	}
 
-	log.Printf("Result: %v", stations)
+	log.Debugf("Result: %v", stations)
 
 	return stations, nil
 }
@@ -79,7 +80,25 @@ func (r *Client) GetMostLikedStations(count int) ([]RadioProvider.Station, error
 		return nil, errors.Wrap(err, "unmarshal stations")
 	}
 
-	log.Printf("Result: %v", stations)
+	log.Debugf("Result: %v", stations)
+
+	return stations, nil
+}
+
+func (r *Client) SearchStations(search string) ([]RadioProvider.Station, error) {
+	resp, err := resty.R().Get("http://www.radio-browser.info/webservice/json/stations/byname/" + url.PathEscape(search))
+	if err != nil {
+		return nil, errors.Wrap(err, "get stations")
+	}
+
+	var stations []RadioProvider.Station
+
+	err = json.Unmarshal(resp.Body(), &stations)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal stations")
+	}
+
+	log.Debugf("Result: %v", stations)
 
 	return stations, nil
 }
@@ -97,7 +116,7 @@ func (r *Client) GetStationById(stationId string) (RadioProvider.Station, error)
 		return RadioProvider.Station{}, errors.Wrap(err, "unmarshal station")
 	}
 
-	log.Printf("Result: %v", stations)
+	log.Debugf("Result: %v", stations)
 
 	if len(stations) > 0 {
 		return stations[0], nil
