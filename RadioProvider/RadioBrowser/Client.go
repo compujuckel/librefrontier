@@ -6,6 +6,7 @@ import (
 	"gopkg.in/resty.v1"
 	"librefrontier/RadioProvider"
 	"log"
+	"strconv"
 )
 
 type Client struct {
@@ -31,6 +32,42 @@ func (r *Client) GetCountries() ([]RadioProvider.Country, error) {
 
 func (r *Client) GetStationsByCountry(countryId string) ([]RadioProvider.Station, error) {
 	resp, err := resty.R().Get("http://www.radio-browser.info/webservice/json/stations/bycountry/" + countryId)
+	if err != nil {
+		return nil, errors.Wrap(err, "get stations")
+	}
+
+	var stations []RadioProvider.Station
+
+	err = json.Unmarshal(resp.Body(), &stations)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal stations")
+	}
+
+	log.Printf("Result: %v", stations)
+
+	return stations, nil
+}
+
+func (r *Client) GetMostPopularStations(count int) ([]RadioProvider.Station, error) {
+	resp, err := resty.R().Get("http://www.radio-browser.info/webservice/json/stations/topclick/" + strconv.Itoa(count))
+	if err != nil {
+		return nil, errors.Wrap(err, "get stations")
+	}
+
+	var stations []RadioProvider.Station
+
+	err = json.Unmarshal(resp.Body(), &stations)
+	if err != nil {
+		return nil, errors.Wrap(err, "unmarshal stations")
+	}
+
+	log.Printf("Result: %v", stations)
+
+	return stations, nil
+}
+
+func (r *Client) GetMostLikedStations(count int) ([]RadioProvider.Station, error) {
+	resp, err := resty.R().Get("http://www.radio-browser.info/webservice/json/stations/topvote/" + strconv.Itoa(count))
 	if err != nil {
 		return nil, errors.Wrap(err, "get stations")
 	}

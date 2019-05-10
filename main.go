@@ -21,16 +21,34 @@ func gofile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	log.Printf("gofile dlang = %s", vars["dlang"])
 
-	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-	<ListOfItems>
-	<ItemCount>1</ItemCount>
-	<Item>
-	<ItemType>Dir</ItemType>
-	<Title>By Country</Title>
-	<UrlDir>http://192.168.178.156/countries</UrlDir>
-	<UrlDirBackUp>http://192.168.178.156/countries</UrlDirBackUp>
-	</Item>
-	</ListOfItems>`)
+	menu := ListOfItems{
+		ItemCount: 4,
+		Items: []Item{
+			{
+				ItemType:     "Dir",
+				Title:        "By Country",
+				UrlDir:       "http://192.168.178.156/countries",
+				UrlDirBackUp: "http://192.168.178.156/countries",
+			}, {
+				ItemType:     "Dir",
+				Title:        "Most popular",
+				UrlDir:       "http://192.168.178.156/stations/popular",
+				UrlDirBackUp: "http://192.168.178.156/stations/popular",
+			}, {
+				ItemType:     "Dir",
+				Title:        "Most liked",
+				UrlDir:       "http://192.168.178.156/stations/liked",
+				UrlDirBackUp: "http://192.168.178.156/stations/liked",
+			}, {
+				ItemType:     "Dir",
+				Title:        "LibreFrontier PoC",
+				UrlDir:       "http://192.168.178.156/",
+				UrlDirBackUp: "http://192.168.178.156/",
+			},
+		},
+	}
+
+	WriteToWire(w, menu)
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +118,56 @@ func getStationsByCountry(w http.ResponseWriter, r *http.Request) {
 	WriteToWire(w, list)
 }
 
+func getMostPopularStations(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	iStart, err := strconv.Atoi(vars["startItems"])
+	if err != nil {
+		log.Fatal("Error converting str to int", err)
+	}
+
+	iEnd, err := strconv.Atoi(vars["endItems"])
+	if err != nil {
+		log.Fatal("Error converting str to int", err)
+	}
+
+	rp := RadioBrowser.Client{}
+
+	stations, err := rp.GetMostPopularStations(100)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+	list := CreateStationsList(stations, iStart-1, iEnd)
+
+	WriteToWire(w, list)
+}
+
+func getMostLikedStations(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	iStart, err := strconv.Atoi(vars["startItems"])
+	if err != nil {
+		log.Fatal("Error converting str to int", err)
+	}
+
+	iEnd, err := strconv.Atoi(vars["endItems"])
+	if err != nil {
+		log.Fatal("Error converting str to int", err)
+	}
+
+	rp := RadioBrowser.Client{}
+
+	stations, err := rp.GetMostLikedStations(100)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+	list := CreateStationsList(stations, iStart-1, iEnd)
+
+	WriteToWire(w, list)
+}
+
 func getStreamUrl(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
@@ -132,6 +200,12 @@ func main() {
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/country/{country}", getStationsByCountry).
+		Queries("startItems", "{startItems}").
+		Queries("endItems", "{endItems}")
+	r.HandleFunc("/stations/popular", getMostPopularStations).
+		Queries("startItems", "{startItems}").
+		Queries("endItems", "{endItems}")
+	r.HandleFunc("/stations/liked", getMostLikedStations).
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/station/{station}/play", getStreamUrl)
