@@ -15,4 +15,8 @@ Silicon Frontier switched their radio data provider in May 2019 which made the I
 - [ ] Custom stations
 - ... more
 
+## How does this work?
+Silicon Frontier devices talk to their vendor-specific backend at wifiradiofrontier.com (e.g. teufel.wifiradiofrontier.com) via a simple, unencrypted HTTP API.  
+To use LibreFrontier, create a DNS entry for this domain in your router and point it to the LibreFrontier instance. A public instance will probably come soon(tm)
+
 **This project is work in progress and only tested on a Teufel Radio 3sixty.**
