@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/mux"
-	"librefrontier/RadioBrowser"
 	"librefrontier/RadioProvider"
+	"librefrontier/RadioProvider/RadioBrowser"
 	"log"
 	"net/http"
 	"strconv"
@@ -38,9 +38,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("search mac = %s Search = %s sSearchtype = %s\n", vars["mac"], vars["Search"], vars["sSearchtype"])
 
-	rp := RadioBrowser.RadioBrowserRadioProvider{}
+	rp := RadioBrowser.Client{}
 
-	station := rp.GetStationById(vars["Search"])
+	station, err := rp.GetStationById(vars["Search"])
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
 	list := CreateStationsList([]RadioProvider.Station{station}, 0, 0)
 
 	WriteToWire(w, list)
@@ -59,9 +63,13 @@ func getCountries(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Error converting str to int", err)
 	}
 
-	rp := RadioBrowser.RadioBrowserRadioProvider{}
+	rp := RadioBrowser.Client{}
 
-	countries := rp.GetCountries()
+	countries, err := rp.GetCountries()
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
 	list := CreateCountryList(countries, iStart-1, iEnd)
 
 	WriteToWire(w, list)
@@ -80,12 +88,30 @@ func getStationsByCountry(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Error converting str to int", err)
 	}
 
-	rp := RadioBrowser.RadioBrowserRadioProvider{}
+	rp := RadioBrowser.Client{}
 
-	stations := rp.GetStationsByCountry(vars["country"])
+	stations, err := rp.GetStationsByCountry(vars["country"])
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
 	list := CreateStationsList(stations, iStart-1, iEnd)
 
 	WriteToWire(w, list)
+}
+
+func getStreamUrl(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	rp := RadioBrowser.Client{}
+
+	station, err := rp.GetStationById(vars["station"])
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	w.Write([]byte(station.StreamUrl))
 }
 
 func main() {
@@ -108,6 +134,7 @@ func main() {
 	r.HandleFunc("/country/{country}", getStationsByCountry).
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
+	r.HandleFunc("/station/{station}/play", getStreamUrl)
 
 	// ?sSearchtype=3&Search=75692&mac=b640a0c203b5ee50dac407aff8713da4&dlang=eng&fver=6&ven=teufel2
 

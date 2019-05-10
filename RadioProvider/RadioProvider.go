@@ -18,7 +18,7 @@ type Station struct {
 }
 
 type RadioProvider interface {
-	GetCountries() []Country
-	GetStationsByCountry(countryId string) []Station
-	GetStationById(stationId string) Station
+	GetCountries() ([]Country, error)
+	GetStationsByCountry(countryId string) ([]Station, error)
+	GetStationById(stationId string) (Station, error)
 }

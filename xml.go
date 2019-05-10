@@ -59,7 +59,6 @@ func CreateCountryList(countries []RadioProvider.Country, start int, end int) Li
 		UrlPreviousBackUp: "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
-		log.Println(i)
 		items = append(items, Item{
 			ItemType:     "Dir",
 			Title:        countries[i].Name,
@@ -94,7 +93,6 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 		UrlPreviousBackUp: "http://192.168.178.156/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
-		log.Println(i)
 		items = append(items, CreateStationItem(stations[i]))
 	}
 
@@ -113,7 +111,7 @@ func CreateStationItem(station RadioProvider.Station) Item {
 		StationBandWidth: station.Bitrate,
 		StationMime:      station.Codec,
 		StationFormat:    station.Genre,
-		StationUrl:       "http://www.radio-browser.info/webservice/v2/m3u/url/" + station.Id,
+		StationUrl:       "http://192.168.178.156/station/" + station.Id + "/play",
 		//StationUrl: station.StreamUrl,
 	}
 }
