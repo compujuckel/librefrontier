@@ -54,6 +54,13 @@ func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBu
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/station/{station}/play", a.getStreamUrl)
+	r.HandleFunc("/station/{station}", a.getStationDetail)
+	r.HandleFunc("/favorite/add/{station}", a.addFavorite).
+		Queries("mac", "{mac}")
+	r.HandleFunc("/favorites", a.getFavorites).
+		Queries("mac", "{mac}").
+		Queries("startItems", "{startItems}").
+		Queries("endItems", "{endItems}")
 
 	server := http.Server{
 		Addr:    ":80",
@@ -91,6 +98,11 @@ func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
 
 	items := []Item{
 		{
+			ItemType:     "Dir",
+			Title:        "Favorites",
+			UrlDir:       a.cfg.apiBaseUrl + "/favorites",
+			UrlDirBackUp: a.cfg.apiBaseUrl + "/favorites",
+		}, {
 			ItemType:     "Dir",
 			Title:        "By Country",
 			UrlDir:       a.cfg.apiBaseUrl + "/countries",
@@ -139,7 +151,7 @@ func (a *ApiServer) search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		return
 	}
-	list := a.xml.CreateStationsList([]RadioProvider.Station{station}, 0, 0)
+	list := a.xml.CreateStationsList([]RadioProvider.Station{station}, 0, 0, true)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -193,7 +205,7 @@ func (a *ApiServer) getStationsByCountry(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(500)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd)
+	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -220,7 +232,7 @@ func (a *ApiServer) getMostPopularStations(w http.ResponseWriter, r *http.Reques
 		w.WriteHeader(500)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd)
+	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -247,7 +259,7 @@ func (a *ApiServer) getMostLikedStations(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(500)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd)
+	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -274,7 +286,21 @@ func (a *ApiServer) searchStations(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd)
+	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
+
+	a.xml.WriteToWire(w, list)
+}
+
+func (a *ApiServer) getStationDetail(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	station, err := a.radio.GetStationById(vars["station"])
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+	// TODO check if station is already in favorites
+	list := a.xml.CreateStationDetail(station, false)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -289,4 +315,58 @@ func (a *ApiServer) getStreamUrl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(station.StreamUrl))
+}
+
+func (a *ApiServer) addFavorite(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	station, err := a.radio.GetStationById(vars["station"])
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	id, err := strconv.ParseUint(station.Id, 10, 32)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	a.db.AddFavorite(vars["mac"], uint(id), station.Name)
+	log.Infof("Added favorite %s for mac %s", station.Name, vars["mac"])
+
+	list := a.xml.CreateStationDetail(station, false)
+
+	a.xml.WriteToWire(w, list)
+}
+
+func (a *ApiServer) getFavorites(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	iStart, err := strconv.Atoi(vars["startItems"])
+	if err != nil {
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
+	}
+
+	iEnd, err := strconv.Atoi(vars["endItems"])
+	if err != nil {
+		log.Error("Error converting str to int", err)
+		w.WriteHeader(400)
+		return
+	}
+
+	dbStations := a.db.GetFavoriteStations(vars["mac"])
+	stations := make([]RadioProvider.Station, len(dbStations))
+	for i := 0; i < len(dbStations); i++ {
+		stations[i] = RadioProvider.Station{
+			Name: dbStations[i].Name,
+			Id:   strconv.Itoa(int(dbStations[i].StationId)),
+		}
+	}
+
+	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
+
+	a.xml.WriteToWire(w, list)
 }

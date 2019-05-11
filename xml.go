@@ -92,7 +92,7 @@ func (x *XmlBuilder) CreateCountryList(countries []RadioProvider.Country, start 
 	return result
 }
 
-func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start int, end int) ListOfItems {
+func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start int, end int, direct bool) ListOfItems {
 	result := ListOfItems{
 		ItemCount: len(stations),
 	}
@@ -113,12 +113,25 @@ func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start 
 		UrlPreviousBackUp: x.cfg.apiBaseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
-		items = append(items, x.CreateStationItem(stations[i]))
+		if direct {
+			items = append(items, x.CreateStationItem(stations[i]))
+		} else {
+			items = append(items, x.CreateStationDetailLinkItem(stations[i]))
+		}
 	}
 
 	result.Items = items
 
 	return result
+}
+
+func (x *XmlBuilder) CreateStationDetailLinkItem(station RadioProvider.Station) Item {
+	return Item{
+		ItemType:     "Dir",
+		Title:        station.Name,
+		UrlDir:       x.cfg.apiBaseUrl + "/station/" + station.Id,
+		UrlDirBackUp: x.cfg.apiBaseUrl + "/station/" + station.Id,
+	}
 }
 
 func (x *XmlBuilder) CreateStationItem(station RadioProvider.Station) Item {
@@ -133,6 +146,40 @@ func (x *XmlBuilder) CreateStationItem(station RadioProvider.Station) Item {
 		//StationFormat:    station.Genre,
 		StationUrl: x.cfg.apiBaseUrl + "/station/" + station.Id + "/play",
 		//StationUrl: station.StreamUrl,
+	}
+}
+
+func (x *XmlBuilder) CreateStationDetail(station RadioProvider.Station, favorite bool) ListOfItems {
+	var favItem Item
+	if favorite {
+		favItem = Item{
+			ItemType:     "Dir",
+			Title:        "Remove from favorites",
+			UrlDir:       x.cfg.apiBaseUrl + "/favorite/remove/" + station.Id,
+			UrlDirBackUp: x.cfg.apiBaseUrl + "/favorite/remove/" + station.Id,
+		}
+	} else {
+		favItem = Item{
+			ItemType:     "Dir",
+			Title:        "Add to favorites",
+			UrlDir:       x.cfg.apiBaseUrl + "/favorite/add/" + station.Id,
+			UrlDirBackUp: x.cfg.apiBaseUrl + "/favorite/add/" + station.Id,
+		}
+	}
+
+	items := []Item{
+		{
+			ItemType:          "Previous",
+			UrlPrevious:       x.cfg.apiBaseUrl + "/TODO",
+			UrlPreviousBackUp: x.cfg.apiBaseUrl + "/TODO",
+		},
+		x.CreateStationItem(station),
+		favItem,
+	}
+
+	return ListOfItems{
+		ItemCount: len(items) - 1,
+		Items:     items,
 	}
 }
 
