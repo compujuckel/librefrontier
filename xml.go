@@ -46,7 +46,19 @@ type Item struct {
 	SearchCancel    string `xml:"SearchCancel,omitempty"`
 }
 
-func CreateCountryList(countries []RadioProvider.Country, start int, end int) ListOfItems {
+type XmlBuilder struct {
+	cfg *Config
+}
+
+func NewXmlBuilder(config *Config) *XmlBuilder {
+	x := XmlBuilder{
+		cfg: config,
+	}
+
+	return &x
+}
+
+func (x *XmlBuilder) CreateCountryList(countries []RadioProvider.Country, start int, end int) ListOfItems {
 	result := ListOfItems{
 		ItemCount: len(countries),
 	}
@@ -63,15 +75,15 @@ func CreateCountryList(countries []RadioProvider.Country, start int, end int) Li
 
 	items = append(items, Item{
 		ItemType:          "Previous",
-		UrlPrevious:       baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
-		UrlPreviousBackUp: baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPrevious:       x.cfg.apiBaseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPreviousBackUp: x.cfg.apiBaseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
 		items = append(items, Item{
 			ItemType:     "Dir",
 			Title:        countries[i].Name,
-			UrlDir:       baseUrl + "/country/" + url.PathEscape(countries[i].Id),
-			UrlDirBackUp: baseUrl + "/country/" + url.PathEscape(countries[i].Id),
+			UrlDir:       x.cfg.apiBaseUrl + "/country/" + url.PathEscape(countries[i].Id),
+			UrlDirBackUp: x.cfg.apiBaseUrl + "/country/" + url.PathEscape(countries[i].Id),
 		})
 	}
 
@@ -80,7 +92,7 @@ func CreateCountryList(countries []RadioProvider.Country, start int, end int) Li
 	return result
 }
 
-func CreateStationsList(stations []RadioProvider.Station, start int, end int) ListOfItems {
+func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start int, end int) ListOfItems {
 	result := ListOfItems{
 		ItemCount: len(stations),
 	}
@@ -97,11 +109,11 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 
 	items = append(items, Item{
 		ItemType:          "Previous",
-		UrlPrevious:       baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
-		UrlPreviousBackUp: baseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPrevious:       x.cfg.apiBaseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
+		UrlPreviousBackUp: x.cfg.apiBaseUrl + "/setupapp/karcher/asp/BrowseXML/loginXML.asp?gofile=",
 	})
 	for i := start; i < end; i++ {
-		items = append(items, CreateStationItem(stations[i]))
+		items = append(items, x.CreateStationItem(stations[i]))
 	}
 
 	result.Items = items
@@ -109,7 +121,7 @@ func CreateStationsList(stations []RadioProvider.Station, start int, end int) Li
 	return result
 }
 
-func CreateStationItem(station RadioProvider.Station) Item {
+func (x *XmlBuilder) CreateStationItem(station RadioProvider.Station) Item {
 	return Item{
 		ItemType:    "Station",
 		StationName: station.Name,
@@ -119,12 +131,12 @@ func CreateStationItem(station RadioProvider.Station) Item {
 		//StationBandWidth: station.Bitrate,
 		//StationMime:      station.Codec,
 		//StationFormat:    station.Genre,
-		StationUrl: baseUrl + "/station/" + station.Id + "/play",
+		StationUrl: x.cfg.apiBaseUrl + "/station/" + station.Id + "/play",
 		//StationUrl: station.StreamUrl,
 	}
 }
 
-func WriteToWire(w http.ResponseWriter, items ListOfItems) {
+func (x *XmlBuilder) WriteToWire(w http.ResponseWriter, items ListOfItems) {
 	result, err := xml.Marshal(items)
 	if err != nil {
 		log.Error("Error in xml.Marshal", err)

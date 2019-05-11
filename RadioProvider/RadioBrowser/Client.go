@@ -13,6 +13,12 @@ import (
 type Client struct {
 }
 
+func NewRadioBrowserClient() RadioProvider.RadioProvider {
+	return &Client{}
+}
+
+var _ RadioProvider.RadioProvider = (*Client)(nil)
+
 func (r *Client) GetCountries() ([]RadioProvider.Country, error) {
 	resp, err := resty.R().Get("http://www.radio-browser.info/webservice/json/countries")
 	if err != nil {
