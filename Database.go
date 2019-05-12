@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"github.com/compujuckel/librefrontier/RadioProvider"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"librefrontier/RadioProvider"
 )
 
 type Database struct {

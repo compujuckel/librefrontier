@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/compujuckel/librefrontier/RadioProvider/RadioBrowser"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
-	"librefrontier/RadioProvider/RadioBrowser"
 	"os"
 )
 

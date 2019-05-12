@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/compujuckel/librefrontier/RadioProvider"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
-	"librefrontier/RadioProvider"
 	"net/http"
 	"strconv"
 )

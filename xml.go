@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/xml"
+	"github.com/compujuckel/librefrontier/RadioProvider"
 	log "github.com/sirupsen/logrus"
-	"librefrontier/RadioProvider"
 	"net/http"
 	"net/url"
 	"strconv"

@@ -2,10 +2,10 @@ package RadioBrowser
 
 import (
 	"encoding/json"
+	"github.com/compujuckel/librefrontier/RadioProvider"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/resty.v1"
-	"librefrontier/RadioProvider"
 	"net/url"
 	"strconv"
 )
