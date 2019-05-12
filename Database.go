@@ -1,61 +1,113 @@
 package main
 
 import (
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
+	"database/sql"
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"librefrontier/RadioProvider"
 )
 
-type Device struct {
-	gorm.Model
-	Mac              string    `gorm:"UNIQUE; NOT NULL"`
-	FavoriteStations []Station `gorm:"many2many:favorite"`
-}
-
-type Station struct {
-	gorm.Model
-	StationId uint   `gorm:"NOT NULL"`
-	Name      string `gorm:"NOT NULL"`
-}
-
 type Database struct {
-	dbHandle *gorm.DB
+	db *sql.DB
 }
 
 func NewDatabase(config *Config) (*Database, error) {
 	database := Database{}
 
-	db, err := gorm.Open("postgres", config.dbConnString)
+	db, err := sql.Open("postgres", config.dbConnString)
 	if err != nil {
-		return nil, errors.Wrap(err, "Cannot connect to dbHandle")
+		return nil, errors.Wrap(err, "Cannot connect to db")
 	}
 
-	db.LogMode(true)
-	database.dbHandle = db
-
-	db.AutoMigrate(Device{}, Station{})
+	database.db = db
 
 	return &database, nil
 }
 
-func (d *Database) AddFavorite(mac string, stationId uint, stationName string) {
-	var device Device
-	d.dbHandle.FirstOrCreate(&device, Device{Mac: mac})
-	log.Info("Device", device)
+func (d *Database) CreateDevice(mac string) {
+	s := "INSERT INTO device (mac) VALUES ($1) ON CONFLICT DO NOTHING;"
 
-	d.dbHandle.Model(&device).Association("FavoriteStations").Append(Station{
-		StationId: stationId,
-		Name:      stationName,
-	})
+	_, err := d.db.Exec(s, mac)
+	if err != nil {
+		log.Error("Error creating device: ", err)
+	}
 }
 
-func (d *Database) GetFavoriteStations(mac string) []Station {
-	var device Device
-	d.dbHandle.First(&device, Device{Mac: mac})
+func (d *Database) createRadioBrowserStation(stationId int64, stationName string) {
+	s := "INSERT INTO station (radiobrowser_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING;"
 
-	var favorites []Station
-	d.dbHandle.Model(&device).Association("FavoriteStations").Find(&favorites)
+	_, err := d.db.Exec(s, stationId, stationName)
+	if err != nil {
+		log.Error("Error creating station: ", err)
+	}
+}
 
-	return favorites
+func (d *Database) AddFavorite(mac string, stationId int64, stationName string) {
+	d.createRadioBrowserStation(stationId, stationName)
+
+	s := `INSERT INTO favorite (device_id, station_id) SELECT (SELECT d.device_id FROM device d WHERE d.mac = $1), (SELECT s.station_id FROM station s WHERE s.radiobrowser_id = $2)`
+
+	_, err := d.db.Exec(s, mac, stationId)
+	if err != nil {
+		log.Error("Error creating station: ", err)
+	}
+}
+
+func (d *Database) RemoveFavorite(mac string, stationId uint64) {
+	s := `DELETE FROM favorite f
+                USING device d, station s
+           	    WHERE d.device_id = f.device_id
+                  AND s.station_id = f.station_id
+           	      AND s.radiobrowser_id = $1`
+
+	_, err := d.db.Exec(s, stationId)
+	if err != nil {
+		log.Error("Error removing favorite: ", err)
+	}
+}
+
+func (d *Database) IsFavorite(mac string, stationId uint64) bool {
+	s := "SELECT EXISTS(SELECT * FROM favorite f JOIN device d ON d.device_id = f.device_id JOIN station s on s.station_id = f.station_id WHERE d.mac = $1 AND s.radiobrowser_id = $2)"
+
+	row := d.db.QueryRow(s, mac, stationId)
+
+	var exists bool
+	err := row.Scan(&exists)
+	if err != nil {
+		log.Error("cannot parse row", err)
+		return false
+	}
+
+	return exists
+}
+
+func (d *Database) GetFavoriteStations(mac string) []RadioProvider.Station {
+	s := `SELECT s.radiobrowser_id,
+                 s.name
+            FROM favorite f
+            JOIN device d ON d.device_id = f.device_id
+            JOIN station s ON s.station_id = f.station_id
+           WHERE d.mac = $1;`
+
+	rows, err := d.db.Query(s, mac)
+	if err != nil {
+		log.Error("error getting favorite stations", err)
+		return []RadioProvider.Station{}
+	}
+
+	var stations []RadioProvider.Station
+	for rows.Next() {
+		var s RadioProvider.Station
+
+		err := rows.Scan(&s.Id, &s.Name)
+		if err != nil {
+			log.Error("error scanning row", err)
+			return []RadioProvider.Station{}
+		}
+
+		stations = append(stations, s)
+	}
+
+	return stations
 }

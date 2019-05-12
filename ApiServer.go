@@ -54,8 +54,11 @@ func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBu
 		Queries("startItems", "{startItems}").
 		Queries("endItems", "{endItems}")
 	r.HandleFunc("/station/{station}/play", a.getStreamUrl)
-	r.HandleFunc("/station/{station}", a.getStationDetail)
+	r.HandleFunc("/station/{station}", a.getStationDetail).
+		Queries("mac", "{mac}")
 	r.HandleFunc("/favorite/add/{station}", a.addFavorite).
+		Queries("mac", "{mac}")
+	r.HandleFunc("/favorite/remove/{station}", a.removeFavorite).
 		Queries("mac", "{mac}")
 	r.HandleFunc("/favorites", a.getFavorites).
 		Queries("mac", "{mac}").
@@ -143,6 +146,8 @@ func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
 
 func (a *ApiServer) search(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+
+	a.db.CreateDevice(vars["mac"])
 
 	log.Printf("search mac = %s Search = %s sSearchtype = %s\n", vars["mac"], vars["Search"], vars["sSearchtype"])
 
@@ -299,8 +304,15 @@ func (a *ApiServer) getStationDetail(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		return
 	}
-	// TODO check if station is already in favorites
-	list := a.xml.CreateStationDetail(station, false)
+
+	id, err := strconv.ParseUint(station.Id, 10, 32)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	fav := a.db.IsFavorite(vars["mac"], id)
+	list := a.xml.CreateStationDetail(station, fav)
 
 	a.xml.WriteToWire(w, list)
 }
@@ -326,14 +338,37 @@ func (a *ApiServer) addFavorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.ParseUint(station.Id, 10, 32)
+	id, err := strconv.ParseInt(station.Id, 10, 64)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	a.db.AddFavorite(vars["mac"], uint(id), station.Name)
+	a.db.AddFavorite(vars["mac"], id, station.Name)
 	log.Infof("Added favorite %s for mac %s", station.Name, vars["mac"])
+
+	list := a.xml.CreateStationDetail(station, false)
+
+	a.xml.WriteToWire(w, list)
+}
+
+func (a *ApiServer) removeFavorite(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	station, err := a.radio.GetStationById(vars["station"])
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	id, err := strconv.ParseUint(station.Id, 10, 64)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	a.db.RemoveFavorite(vars["mac"], id)
+	log.Infof("Removed favorite %s for mac %s", station.Name, vars["mac"])
 
 	list := a.xml.CreateStationDetail(station, false)
 
@@ -357,14 +392,7 @@ func (a *ApiServer) getFavorites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbStations := a.db.GetFavoriteStations(vars["mac"])
-	stations := make([]RadioProvider.Station, len(dbStations))
-	for i := 0; i < len(dbStations); i++ {
-		stations[i] = RadioProvider.Station{
-			Name: dbStations[i].Name,
-			Id:   strconv.Itoa(int(dbStations[i].StationId)),
-		}
-	}
+	stations := a.db.GetFavoriteStations(vars["mac"])
 
 	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
 
