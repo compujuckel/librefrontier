@@ -1,0 +1,22 @@
+version: '2'
+services:
+  librefrontier:
+    build: .
+    image: compujuckel/librefrontier
+    expose:
+      - "80"
+    environment:
+      LF_API_BASE_URL: "${LF_API_BASE_URL}"
+      LF_DB_CONN_STRING: "${LF_DB_CONN_STRING}"
+  postgres:
+    image: postgres
+    restart: always
+    volumes:
+      - librefrontier-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: librefrontier
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: librefrontier
+volumes:
+  librefrontier-db:
+    driver: local
