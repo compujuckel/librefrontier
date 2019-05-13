@@ -1,4 +1,4 @@
-package RadioProvider
+package radioprovider
 
 type Country struct {
 	Name         string `json:"name"`

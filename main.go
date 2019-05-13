@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/compujuckel/librefrontier/RadioProvider/RadioBrowser"
+	"github.com/compujuckel/librefrontier/radioprovider/radiobrowser"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"os"
@@ -22,7 +22,7 @@ func main() {
 		fx.Provide(
 			NewEnvConfig,
 			NewXmlBuilder,
-			RadioBrowser.NewRadioBrowserClient,
+			radiobrowser.NewRadioBrowserClient,
 			NewDatabase,
 			NewApiController,
 		),

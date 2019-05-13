@@ -2,9 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"github.com/compujuckel/librefrontier/RadioProvider"
-	"github.com/gorilla/mux"
+	"github.com/compujuckel/librefrontier/radioprovider"
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"net/http"
@@ -15,59 +14,62 @@ type ApiServer struct {
 	db    *Database
 	cfg   *Config
 	xml   *XmlBuilder
-	radio RadioProvider.RadioProvider
+	gin   *gin.Engine
+	radio radioprovider.RadioProvider
 }
 
-func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBuilder *XmlBuilder, radioProvider RadioProvider.RadioProvider) *ApiServer {
+type DeviceInfo struct {
+	Mac      string `form:"mac" binding:"required"`
+	Language string `form:"dlang"`
+	Fver     string `form:"fver"`
+	Vendor   string `form:"ven"`
+}
+
+type PaginatedRequest struct {
+	Device *DeviceInfo
+	Start  int `form:"startItems" binding:"required"`
+	End    int `form:"endItems" binding:"required"`
+}
+
+type SearchRequestSingle struct {
+	Device     *DeviceInfo
+	SearchType int    `form:"sSearchtype" binding:"required"`
+	Search     string `form:"Search" binding:"required"`
+}
+
+type SearchRequest struct {
+	Device     *DeviceInfo
+	Start      int    `form:"startItems"`
+	End        int    `form:"endItems"`
+	SearchType int    `form:"sSearchtype" binding:"required"`
+	Search     string `form:"search" binding:"required"`
+}
+
+func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBuilder *XmlBuilder, radioProvider radioprovider.RadioProvider) *ApiServer {
 	a := ApiServer{}
 	a.cfg = config
 	a.db = database
 	a.xml = xmlBuilder
 	a.radio = radioProvider
+	a.gin = gin.Default()
 
-	r := mux.NewRouter()
-
-	r.HandleFunc("/setupapp/karcher/asp/BrowseXML/loginXML.asp", a.login).
-		Queries("token", "{token}")
-	r.HandleFunc("/setupapp/karcher/asp/BrowseXML/loginXML.asp", a.gofile).
-		Queries("gofile", "").
-		Queries("dlang", "{dlang}")
-	r.HandleFunc("/setupapp/karcher/asp/BrowseXML/Search.asp", a.search).
-		Queries("sSearchtype", "{sSearchtype}").
-		Queries("Search", "{Search}").
-		Queries("mac", "{mac}").
-		Queries("dlang", "{dlang}")
-	r.HandleFunc("/countries", a.getCountries).
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
-	r.HandleFunc("/country/{country}", a.getStationsByCountry).
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
-	r.HandleFunc("/stations/popular", a.getMostPopularStations).
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
-	r.HandleFunc("/stations/liked", a.getMostLikedStations).
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
-	r.HandleFunc("/stations/search", a.searchStations).
-		Queries("search", "{search}").
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
-	r.HandleFunc("/station/{station}/play", a.getStreamUrl)
-	r.HandleFunc("/station/{station}", a.getStationDetail).
-		Queries("mac", "{mac}")
-	r.HandleFunc("/favorite/add/{station}", a.addFavorite).
-		Queries("mac", "{mac}")
-	r.HandleFunc("/favorite/remove/{station}", a.removeFavorite).
-		Queries("mac", "{mac}")
-	r.HandleFunc("/favorites", a.getFavorites).
-		Queries("mac", "{mac}").
-		Queries("startItems", "{startItems}").
-		Queries("endItems", "{endItems}")
+	a.gin.GET("/setupapp/karcher/asp/BrowseXML/loginXML.asp", a.fsLoginXML)
+	a.gin.GET("/setupapp/karcher/asp/BrowseXML/Search.asp", a.fsSearch)
+	a.gin.GET("/countries", a.getCountries)
+	a.gin.GET("/country/:country", a.getStationsByCountry)
+	a.gin.GET("/stations/popular", a.getMostPopularStations)
+	a.gin.GET("/stations/liked", a.getMostLikedStations)
+	a.gin.GET("/stations/search", a.searchStations)
+	a.gin.GET("/station/:station/play", a.getStreamUrl)
+	a.gin.GET("/station/:station", a.getStationDetail)
+	a.gin.GET("/favorite/add/:station", a.addFavorite)
+	a.gin.GET("/favorite/remove/:station", a.removeFavorite)
+	a.gin.GET("/favorites", a.getFavorites)
+	a.gin.GET("/empty", a.getEmpty)
 
 	server := http.Server{
 		Addr:    ":80",
-		Handler: r,
+		Handler: a.gin,
 	}
 
 	lc.Append(fx.Hook{
@@ -88,16 +90,14 @@ func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBu
 	return &a
 }
 
-func (a *ApiServer) login(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	log.Printf("login token = %s\n", vars["token"])
+func (a *ApiServer) fsLoginXML(c *gin.Context) {
+	log.Printf("fs_loginXML")
 
-	fmt.Fprint(w, "<EncryptedToken>3a3f5ac48a1dab4e</EncryptedToken>")
-}
-
-func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	log.Printf("gofile dlang = %s", vars["dlang"])
+	if c.Query("token") == "0" {
+		// TODO investigate how this is used
+		c.String(http.StatusOK, "<EncryptedToken>3a3f5ac48a1dab4e</EncryptedToken>")
+		return
+	}
 
 	items := []Item{
 		{
@@ -122,8 +122,8 @@ func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
 			UrlDirBackUp: a.cfg.apiBaseUrl + "/stations/liked",
 		}, {
 			ItemType:        "Search",
-			SearchURL:       a.cfg.apiBaseUrl + "/stations/search?sSearchType=2",
-			SearchURLBackUp: a.cfg.apiBaseUrl + "/stations/search?sSearchType=2",
+			SearchURL:       a.cfg.apiBaseUrl + "/stations/search?sSearchtype=2",
+			SearchURLBackUp: a.cfg.apiBaseUrl + "/stations/search?sSearchtype=2",
 			SearchCaption:   "Search stations",
 			SearchTextbox:   "",
 			SearchGo:        "Search",
@@ -131,8 +131,8 @@ func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
 		}, {
 			ItemType:     "Dir",
 			Title:        "LibreFrontier PoC",
-			UrlDir:       a.cfg.apiBaseUrl + "/",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/",
+			UrlDir:       a.cfg.apiBaseUrl + "/empty",
+			UrlDirBackUp: a.cfg.apiBaseUrl + "/empty",
 		},
 	}
 
@@ -141,260 +141,210 @@ func (a *ApiServer) gofile(w http.ResponseWriter, r *http.Request) {
 		Items:     items,
 	}
 
-	a.xml.WriteToWire(w, menu)
+	// sadly we cannot use c.XML here because it does not write the XML header
+	a.xml.WriteToWire(c.Writer, menu)
 }
 
-func (a *ApiServer) search(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (a *ApiServer) fsSearch(c *gin.Context) {
+	var r SearchRequestSingle
 
-	a.db.CreateDevice(vars["mac"])
-
-	log.Printf("search mac = %s Search = %s sSearchtype = %s\n", vars["mac"], vars["Search"], vars["sSearchtype"])
-
-	station, err := a.radio.GetStationById(vars["Search"])
-	if err != nil {
-		w.WriteHeader(404)
-		return
-	}
-	list := a.xml.CreateStationsList([]RadioProvider.Station{station}, 0, 0, true)
-
-	a.xml.WriteToWire(w, list)
-}
-
-func (a *ApiServer) getCountries(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+	if c.Bind(&r) != nil {
 		return
 	}
 
-	iEnd, err := strconv.Atoi(vars["endItems"])
+	a.db.CreateDevice(r.Device.Mac)
+
+	log.Printf("search mac = %s Search = %s sSearchtype = %s\n", r.Device.Mac, r.Search, r.SearchType)
+
+	station, err := a.radio.GetStationById(r.Search)
 	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	list := a.xml.CreateStationsList([]radioprovider.Station{station}, 0, 0, true)
+
+	a.xml.WriteToWire(c.Writer, list)
+}
+
+func (a *ApiServer) getEmpty(c *gin.Context) {
+	a.xml.WriteToWire(c.Writer, ListOfItems{})
+}
+
+func (a *ApiServer) getCountries(c *gin.Context) {
+	var p PaginatedRequest
+	if c.Bind(&p) != nil {
 		return
 	}
 
 	countries, err := a.radio.GetCountries()
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	list := a.xml.CreateCountryList(countries, iStart-1, iEnd)
+	list := a.xml.CreateCountryList(countries, p.Start-1, p.End)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getStationsByCountry(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+func (a *ApiServer) getStationsByCountry(c *gin.Context) {
+	var p PaginatedRequest
+	if c.Bind(&p) != nil {
 		return
 	}
 
-	iEnd, err := strconv.Atoi(vars["endItems"])
+	stations, err := a.radio.GetStationsByCountry(c.Param("country"))
 	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	list := a.xml.CreateStationsList(stations, p.Start-1, p.End, false)
 
-	stations, err := a.radio.GetStationsByCountry(vars["country"])
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
-
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getMostPopularStations(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
-		return
-	}
-
-	iEnd, err := strconv.Atoi(vars["endItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+func (a *ApiServer) getMostPopularStations(c *gin.Context) {
+	var p PaginatedRequest
+	if c.Bind(&p) != nil {
 		return
 	}
 
 	stations, err := a.radio.GetMostPopularStations(100)
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
+	list := a.xml.CreateStationsList(stations, p.Start-1, p.End, false)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getMostLikedStations(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
-		return
-	}
-
-	iEnd, err := strconv.Atoi(vars["endItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+func (a *ApiServer) getMostLikedStations(c *gin.Context) {
+	var p PaginatedRequest
+	if c.Bind(&p) != nil {
 		return
 	}
 
 	stations, err := a.radio.GetMostLikedStations(100)
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
+	list := a.xml.CreateStationsList(stations, p.Start-1, p.End, false)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) searchStations(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+func (a *ApiServer) searchStations(c *gin.Context) {
+	var s SearchRequest
+	if c.Bind(&s) != nil {
 		return
 	}
 
-	iEnd, err := strconv.Atoi(vars["endItems"])
+	stations, err := a.radio.SearchStations(s.Search)
 	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	list := a.xml.CreateStationsList(stations, s.Start-1, s.End, false)
 
-	stations, err := a.radio.SearchStations(vars["search"])
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
-
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getStationDetail(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (a *ApiServer) getStationDetail(c *gin.Context) {
+	var d DeviceInfo
+	if c.Bind(&d) != nil {
+		return
+	}
 
-	station, err := a.radio.GetStationById(vars["station"])
+	station, err := a.radio.GetStationById(c.Param("station"))
 	if err != nil {
-		w.WriteHeader(404)
+		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
 	id, err := strconv.ParseUint(station.Id, 10, 32)
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
-	fav := a.db.IsFavorite(vars["mac"], id)
+	fav := a.db.IsFavorite(d.Mac, id)
 	list := a.xml.CreateStationDetail(station, fav)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getStreamUrl(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	station, err := a.radio.GetStationById(vars["station"])
+func (a *ApiServer) getStreamUrl(c *gin.Context) {
+	station, err := a.radio.GetStationById(c.Param("station"))
 	if err != nil {
-		w.WriteHeader(404)
+		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
-	w.Write([]byte(station.StreamUrl))
+	c.String(http.StatusOK, station.StreamUrl)
 }
 
-func (a *ApiServer) addFavorite(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (a *ApiServer) addFavorite(c *gin.Context) {
+	var d DeviceInfo
+	if c.Bind(&d) != nil {
+		return
+	}
 
-	station, err := a.radio.GetStationById(vars["station"])
+	station, err := a.radio.GetStationById(c.Param("station"))
 	if err != nil {
-		w.WriteHeader(404)
+		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
 	id, err := strconv.ParseInt(station.Id, 10, 64)
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
-	a.db.AddFavorite(vars["mac"], id, station.Name)
-	log.Infof("Added favorite %s for mac %s", station.Name, vars["mac"])
+	a.db.AddFavorite(d.Mac, id, station.Name)
+	log.Infof("Added favorite %s for mac %s", station.Name, d.Mac)
 
 	list := a.xml.CreateStationDetail(station, false)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) removeFavorite(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (a *ApiServer) removeFavorite(c *gin.Context) {
+	var d DeviceInfo
+	if c.Bind(&d) != nil {
+		return
+	}
 
-	station, err := a.radio.GetStationById(vars["station"])
+	station, err := a.radio.GetStationById(c.Param("station"))
 	if err != nil {
-		w.WriteHeader(404)
+		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
 	id, err := strconv.ParseUint(station.Id, 10, 64)
 	if err != nil {
-		w.WriteHeader(500)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
-	a.db.RemoveFavorite(vars["mac"], id)
-	log.Infof("Removed favorite %s for mac %s", station.Name, vars["mac"])
+	a.db.RemoveFavorite(d.Mac, id)
+	log.Infof("Removed favorite %s for mac %s", station.Name, d.Mac)
 
 	list := a.xml.CreateStationDetail(station, false)
 
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }
 
-func (a *ApiServer) getFavorites(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	iStart, err := strconv.Atoi(vars["startItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
+func (a *ApiServer) getFavorites(c *gin.Context) {
+	var p PaginatedRequest
+	if c.Bind(&p) != nil {
 		return
 	}
 
-	iEnd, err := strconv.Atoi(vars["endItems"])
-	if err != nil {
-		log.Error("Error converting str to int", err)
-		w.WriteHeader(400)
-		return
-	}
+	stations := a.db.GetFavoriteStations(p.Device.Mac)
 
-	stations := a.db.GetFavoriteStations(vars["mac"])
+	list := a.xml.CreateStationsList(stations, p.Start-1, p.End, false)
 
-	list := a.xml.CreateStationsList(stations, iStart-1, iEnd, false)
-
-	a.xml.WriteToWire(w, list)
+	a.xml.WriteToWire(c.Writer, list)
 }

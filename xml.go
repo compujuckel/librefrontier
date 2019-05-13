@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/xml"
-	"github.com/compujuckel/librefrontier/RadioProvider"
+	"github.com/compujuckel/librefrontier/radioprovider"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
@@ -58,7 +58,7 @@ func NewXmlBuilder(config *Config) *XmlBuilder {
 	return &x
 }
 
-func (x *XmlBuilder) CreateCountryList(countries []RadioProvider.Country, start int, end int) ListOfItems {
+func (x *XmlBuilder) CreateCountryList(countries []radioprovider.Country, start int, end int) ListOfItems {
 	result := ListOfItems{
 		ItemCount: len(countries),
 	}
@@ -92,7 +92,7 @@ func (x *XmlBuilder) CreateCountryList(countries []RadioProvider.Country, start 
 	return result
 }
 
-func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start int, end int, direct bool) ListOfItems {
+func (x *XmlBuilder) CreateStationsList(stations []radioprovider.Station, start int, end int, direct bool) ListOfItems {
 	result := ListOfItems{
 		ItemCount: len(stations),
 	}
@@ -125,7 +125,7 @@ func (x *XmlBuilder) CreateStationsList(stations []RadioProvider.Station, start 
 	return result
 }
 
-func (x *XmlBuilder) CreateStationDetailLinkItem(station RadioProvider.Station) Item {
+func (x *XmlBuilder) CreateStationDetailLinkItem(station radioprovider.Station) Item {
 	return Item{
 		ItemType:     "Dir",
 		Title:        station.Name,
@@ -134,7 +134,7 @@ func (x *XmlBuilder) CreateStationDetailLinkItem(station RadioProvider.Station) 
 	}
 }
 
-func (x *XmlBuilder) CreateStationItem(station RadioProvider.Station) Item {
+func (x *XmlBuilder) CreateStationItem(station radioprovider.Station) Item {
 	return Item{
 		ItemType:    "Station",
 		StationName: station.Name,
@@ -149,7 +149,7 @@ func (x *XmlBuilder) CreateStationItem(station RadioProvider.Station) Item {
 	}
 }
 
-func (x *XmlBuilder) CreateStationDetail(station RadioProvider.Station, favorite bool) ListOfItems {
+func (x *XmlBuilder) CreateStationDetail(station radioprovider.Station, favorite bool) ListOfItems {
 	var favItem Item
 	if favorite {
 		favItem = Item{
@@ -174,6 +174,12 @@ func (x *XmlBuilder) CreateStationDetail(station RadioProvider.Station, favorite
 			UrlPreviousBackUp: x.cfg.apiBaseUrl + "/TODO",
 		},
 		x.CreateStationItem(station),
+		{
+			ItemType:     "Dir",
+			Title:        station.Codec + " " + station.Bitrate + "kbps",
+			UrlDir:       x.cfg.apiBaseUrl + "/empty",
+			UrlDirBackUp: x.cfg.apiBaseUrl + "/empty",
+		},
 		favItem,
 	}
 

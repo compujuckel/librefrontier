@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"github.com/compujuckel/librefrontier/RadioProvider"
+	"github.com/compujuckel/librefrontier/radioprovider"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -82,7 +82,7 @@ func (d *Database) IsFavorite(mac string, stationId uint64) bool {
 	return exists
 }
 
-func (d *Database) GetFavoriteStations(mac string) []RadioProvider.Station {
+func (d *Database) GetFavoriteStations(mac string) []radioprovider.Station {
 	s := `SELECT s.radiobrowser_id,
                  s.name
             FROM favorite f
@@ -93,17 +93,17 @@ func (d *Database) GetFavoriteStations(mac string) []RadioProvider.Station {
 	rows, err := d.db.Query(s, mac)
 	if err != nil {
 		log.Error("error getting favorite stations", err)
-		return []RadioProvider.Station{}
+		return []radioprovider.Station{}
 	}
 
-	var stations []RadioProvider.Station
+	var stations []radioprovider.Station
 	for rows.Next() {
-		var s RadioProvider.Station
+		var s radioprovider.Station
 
 		err := rows.Scan(&s.Id, &s.Name)
 		if err != nil {
 			log.Error("error scanning row", err)
-			return []RadioProvider.Station{}
+			return []radioprovider.Station{}
 		}
 
 		stations = append(stations, s)
