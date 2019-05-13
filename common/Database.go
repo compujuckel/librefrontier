@@ -1,8 +1,8 @@
-package main
+package common
 
 import (
 	"database/sql"
-	"github.com/compujuckel/librefrontier/radioprovider"
+	"github.com/compujuckel/librefrontier/common/radioprovider"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"

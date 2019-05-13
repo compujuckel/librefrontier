@@ -2,7 +2,7 @@ package radiobrowser
 
 import (
 	"encoding/json"
-	"github.com/compujuckel/librefrontier/radioprovider"
+	"github.com/compujuckel/librefrontier/common/radioprovider"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/resty.v1"

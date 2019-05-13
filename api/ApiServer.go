@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/compujuckel/librefrontier/radioprovider"
+	"github.com/compujuckel/librefrontier/common"
+	"github.com/compujuckel/librefrontier/common/radioprovider"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
@@ -11,9 +12,9 @@ import (
 )
 
 type ApiServer struct {
-	db    *Database
-	cfg   *Config
-	xml   *XmlBuilder
+	db    *common.Database
+	cfg   *common.Config
+	xml   *common.XmlBuilder
 	gin   *gin.Engine
 	radio radioprovider.RadioProvider
 }
@@ -45,7 +46,7 @@ type SearchRequest struct {
 	Search     string `form:"search" binding:"required"`
 }
 
-func NewApiController(lc fx.Lifecycle, config *Config, database *Database, xmlBuilder *XmlBuilder, radioProvider radioprovider.RadioProvider) *ApiServer {
+func NewApiController(lc fx.Lifecycle, config *common.Config, database *common.Database, xmlBuilder *common.XmlBuilder, radioProvider radioprovider.RadioProvider) *ApiServer {
 	a := ApiServer{}
 	a.cfg = config
 	a.db = database
@@ -99,31 +100,31 @@ func (a *ApiServer) fsLoginXML(c *gin.Context) {
 		return
 	}
 
-	items := []Item{
+	items := []common.Item{
 		{
 			ItemType:     "Dir",
 			Title:        "Favorites",
-			UrlDir:       a.cfg.apiBaseUrl + "/favorites",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/favorites",
+			UrlDir:       a.cfg.GetApiBaseUrl() + "/favorites",
+			UrlDirBackUp: a.cfg.GetApiBaseUrl() + "/favorites",
 		}, {
 			ItemType:     "Dir",
 			Title:        "By Country",
-			UrlDir:       a.cfg.apiBaseUrl + "/countries",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/countries",
+			UrlDir:       a.cfg.GetApiBaseUrl() + "/countries",
+			UrlDirBackUp: a.cfg.GetApiBaseUrl() + "/countries",
 		}, {
 			ItemType:     "Dir",
 			Title:        "Most popular",
-			UrlDir:       a.cfg.apiBaseUrl + "/stations/popular",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/stations/popular",
+			UrlDir:       a.cfg.GetApiBaseUrl() + "/stations/popular",
+			UrlDirBackUp: a.cfg.GetApiBaseUrl() + "/stations/popular",
 		}, {
 			ItemType:     "Dir",
 			Title:        "Most liked",
-			UrlDir:       a.cfg.apiBaseUrl + "/stations/liked",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/stations/liked",
+			UrlDir:       a.cfg.GetApiBaseUrl() + "/stations/liked",
+			UrlDirBackUp: a.cfg.GetApiBaseUrl() + "/stations/liked",
 		}, {
 			ItemType:        "Search",
-			SearchURL:       a.cfg.apiBaseUrl + "/stations/search?sSearchtype=2",
-			SearchURLBackUp: a.cfg.apiBaseUrl + "/stations/search?sSearchtype=2",
+			SearchURL:       a.cfg.GetApiBaseUrl() + "/stations/search?sSearchtype=2",
+			SearchURLBackUp: a.cfg.GetApiBaseUrl() + "/stations/search?sSearchtype=2",
 			SearchCaption:   "Search stations",
 			SearchTextbox:   "",
 			SearchGo:        "Search",
@@ -131,12 +132,12 @@ func (a *ApiServer) fsLoginXML(c *gin.Context) {
 		}, {
 			ItemType:     "Dir",
 			Title:        "LibreFrontier PoC",
-			UrlDir:       a.cfg.apiBaseUrl + "/empty",
-			UrlDirBackUp: a.cfg.apiBaseUrl + "/empty",
+			UrlDir:       a.cfg.GetApiBaseUrl() + "/empty",
+			UrlDirBackUp: a.cfg.GetApiBaseUrl() + "/empty",
 		},
 	}
 
-	menu := ListOfItems{
+	menu := common.ListOfItems{
 		ItemCount: len(items),
 		Items:     items,
 	}
@@ -167,7 +168,7 @@ func (a *ApiServer) fsSearch(c *gin.Context) {
 }
 
 func (a *ApiServer) getEmpty(c *gin.Context) {
-	a.xml.WriteToWire(c.Writer, ListOfItems{})
+	a.xml.WriteToWire(c.Writer, common.ListOfItems{})
 }
 
 func (a *ApiServer) getCountries(c *gin.Context) {

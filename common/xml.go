@@ -1,8 +1,8 @@
-package main
+package common
 
 import (
 	"encoding/xml"
-	"github.com/compujuckel/librefrontier/radioprovider"
+	"github.com/compujuckel/librefrontier/common/radioprovider"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/compujuckel/librefrontier/radioprovider/radiobrowser"
+	"github.com/compujuckel/librefrontier/common"
+	"github.com/compujuckel/librefrontier/common/radioprovider/radiobrowser"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/fx"
 	"os"
@@ -20,10 +21,10 @@ func main() {
 
 	app := fx.New(
 		fx.Provide(
-			NewEnvConfig,
-			NewXmlBuilder,
+			common.NewEnvConfig,
+			common.NewXmlBuilder,
 			radiobrowser.NewRadioBrowserClient,
-			NewDatabase,
+			common.NewDatabase,
 			NewApiController,
 		),
 		fx.Invoke(Startup),
